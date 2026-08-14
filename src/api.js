@@ -4,6 +4,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, ''
 const STORAGE_KEY = 'family-tree.people.v2'
 const LEGACY_STORAGE_KEY = 'family-tree.people.v1'
 const TOKEN_KEY = 'family-tree.api-token.v1'
+const LOCAL_EDITOR_HASH = '4cb76c8fa977eeab772121997a7b5c97ecd51ad2126a0f83f410f1df09d156c7'
 
 // 清理旧版山东平度演示数据；真实手绘图数据使用 v2。
 if (typeof window !== 'undefined') window.localStorage.removeItem(LEGACY_STORAGE_KEY)
@@ -19,7 +20,7 @@ function localPeople() {
 
 export async function getPeople() {
   if (!API_BASE_URL) return localPeople()
-  const response = await fetch(`${API_BASE_URL}/people`, { headers: authHeaders() })
+  const response = await fetch(`${API_BASE_URL}/people`)
   if (!response.ok) {
     const error = new Error(response.status === 401 ? '请先输入家族访问口令' : '家谱数据加载失败')
     error.status = response.status
@@ -60,7 +61,14 @@ export function clearSession() {
 }
 
 export async function login(code) {
-  if (!API_BASE_URL) return
+  if (!API_BASE_URL) {
+    const bytes = new TextEncoder().encode(code)
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+    if (hash !== LOCAL_EDITOR_HASH) throw new Error('访问口令不正确')
+    window.sessionStorage.setItem(TOKEN_KEY, 'local-editor')
+    return
+  }
   const response = await fetch(`${API_BASE_URL}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

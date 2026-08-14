@@ -29,15 +29,12 @@ function App() {
   const [selectedId, setSelectedId] = useState('p4')
   const [query, setQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [authPrompt, setAuthPrompt] = useState('')
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
-  const [authenticated, setAuthenticated] = useState(() => !hasRemoteApi() || hasSession())
+  const [authenticated, setAuthenticated] = useState(() => hasSession())
 
   useEffect(() => {
-    if (hasRemoteApi() && !authenticated) {
-      setLoading(false)
-      return undefined
-    }
     setLoading(true)
     getPeople()
       .then(setPeople)
@@ -48,7 +45,7 @@ function App() {
         } else setToast(error.message || '数据加载失败')
       })
       .finally(() => setLoading(false))
-  }, [authenticated])
+  }, [])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -59,6 +56,24 @@ function App() {
   const selected = people.find((person) => person.id === selectedId) || people[0]
   const pending = people.filter((person) => person.status === '待确认')
   const filteredPeople = people.filter((person) => `${person.name}${person.branch}${person.location}`.includes(query.trim()))
+
+  function requestEditor(action) {
+    if (!authenticated) {
+      setAuthPrompt(action)
+      return
+    }
+    if (action === 'add') setShowModal(true)
+    else window.alert('编辑权限已验证；编辑表单将在下一步接入。')
+  }
+
+  async function handleEditorLogin(code) {
+    await login(code)
+    setAuthenticated(true)
+    const action = authPrompt
+    setAuthPrompt('')
+    if (action === 'add') setShowModal(true)
+    else setToast('编辑权限已验证')
+  }
 
   async function handleCreate(form) {
     const person = {
@@ -83,13 +98,13 @@ function App() {
       if (error.status === 401) {
         clearSession()
         setAuthenticated(false)
+        setAuthPrompt('add')
       }
       setToast(error.message)
     }
   }
 
   if (loading) return <div className="loading-screen"><div className="brand-mark">谱</div><p>正在打开家谱...</p></div>
-  if (hasRemoteApi() && !authenticated) return <LoginScreen onLogin={async (code) => { await login(code); setAuthenticated(true) }} />
 
   return (
     <div className="app-shell">
@@ -103,21 +118,22 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="topbar"><div className="breadcrumb"><span>我的家谱</span><b>/</b><strong>{navItems.find((item) => item.id === active)?.label}</strong></div><div className="top-actions"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、分支或地点" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="通知">♢<i /></button><button className="primary-button" onClick={() => setShowModal(true)}><span>＋</span> 添加成员</button></div></header>
+        <header className="topbar"><div className="breadcrumb"><span>我的家谱</span><b>/</b><strong>{navItems.find((item) => item.id === active)?.label}</strong></div><div className="top-actions"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、分支或地点" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="通知">♢<i /></button><button className="primary-button" onClick={() => requestEditor('add')}><span>＋</span> 添加成员</button></div></header>
 
-        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => setShowModal(true)} />}
-        {active === 'members' && <Members people={filteredPeople} query={query} onSelect={(id) => { setSelectedId(id); setActive('overview') }} onAdd={() => setShowModal(true)} />}
+        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => requestEditor('add')} onEdit={() => requestEditor('edit')} />}
+        {active === 'members' && <Members people={filteredPeople} query={query} onSelect={(id) => { setSelectedId(id); setActive('overview') }} onAdd={() => requestEditor('add')} />}
         {active === 'materials' && <Materials />}
         {active === 'review' && <Review pending={pending} onSelect={(id) => { setSelectedId(id); setActive('overview') }} />}
       </main>
 
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
       {showModal && <AddPersonModal onClose={() => setShowModal(false)} onSubmit={handleCreate} />}
+      {authPrompt && <LoginScreen onClose={() => setAuthPrompt('')} onLogin={handleEditorLogin} />}
     </div>
   )
 }
 
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onClose, onLogin }) {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -127,15 +143,15 @@ function LoginScreen({ onLogin }) {
     setError('')
     try { await onLogin(code.trim()) } catch (loginError) { setError(loginError.message) } finally { setSubmitting(false) }
   }
-  return <div className="login-screen"><div className="login-card"><div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div><span className="eyebrow warm">曹氏家谱 · 家人专用</span><h1>欢迎回到家族档案</h1><p>请输入家族访问口令，进入家谱和资料库。</p><form onSubmit={submit}><label>访问口令<input autoFocus type="password" value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入访问口令" required /></label>{error && <div className="login-error">{error}</div>}<button className="primary-button login-button" disabled={submitting}>{submitting ? '验证中…' : '进入家谱'}</button></form><small>口令由家谱管理员保管，不会写入网页代码。</small></div></div>
+  return <div className="login-screen" onMouseDown={onClose}><div className="login-card" onMouseDown={(event) => event.stopPropagation()}><button className="close-login" type="button" onClick={onClose}>×</button><div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div><span className="eyebrow warm">曹氏家谱 · 编辑权限</span><h1>验证后编辑家谱</h1><p>浏览家谱无需口令，新增或修改资料前请输入编辑口令。</p><form onSubmit={submit}><label>编辑口令<input autoFocus type="password" value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入编辑口令" required /></label>{error && <div className="login-error">{error}</div>}<button className="primary-button login-button" disabled={submitting}>{submitting ? '验证中…' : '验证编辑权限'}</button></form><small>口令由家谱管理员保管。</small></div></div>
 }
 
-function Overview({ people, selected, pending, onSelect, onAdd }) {
+function Overview({ people, selected, pending, onSelect, onAdd, onEdit }) {
   const generations = new Set(people.map((person) => person.generation)).size
   return <div className="page-wrap">
     <section className="welcome"><div><span className="eyebrow warm">{familyProfile.subtitle} · 2026 年 08 月更新</span><h1>把小石口的<em>家族根脉</em>留下来。</h1><p>目前已记录祖籍地点，姓名、字辈和世系只依据家谱原件与家人核对后入档。</p></div><div className="welcome-actions"><button className="secondary-button" onClick={() => window.alert('请先收集家谱原件、墓碑照片或家人口述资料')}>⇧ 导入资料</button><button className="primary-button" onClick={onAdd}><span>＋</span> 添加成员</button></div></section>
     <section className="stats-grid"><Stat label="已录入档案" value={people.length} suffix="条" trend="含 1 条祖源待考节点" icon="♧" tone="blue" /><Stat label="记录世代" value={generations} suffix="代" trend="具体世系尚未确认" icon="⌁" tone="orange" /><Stat label="待确认信息" value={pending.length} suffix="条" trend="需要家人共同核对" icon="◷" tone="purple" /><Stat label="资料完整度" value={familyProfile.completeness} suffix="%" trend="先补原始家谱与字辈" icon="◌" tone="green" /></section>
-    <section className="content-grid"><div className="panel tree-panel"><div className="panel-header"><div><span className="eyebrow">关系图谱</span><h2>家族脉络</h2></div><div className="panel-tools"><span className="live-dot">● 实时预览</span><button className="small-button">−</button><span className="zoom-value">100%</span><button className="small-button">＋</button><button className="small-button">⛶</button></div></div><div className="tree-legend"><span><i className="legend-line confirmed" />已确认</span><span><i className="legend-line pending" />待确认</span><span className="tree-tip">点击人物查看详细资料</span></div><Tree people={people} selectedId={selected?.id} onSelect={onSelect} /></div><PersonPanel person={selected} people={people} onEdit={() => window.alert('编辑表单将在下一步接入')} /></section>
+    <section className="content-grid"><div className="panel tree-panel"><div className="panel-header"><div><span className="eyebrow">关系图谱</span><h2>家族脉络</h2></div><div className="panel-tools"><span className="live-dot">● 实时预览</span><button className="small-button">−</button><span className="zoom-value">100%</span><button className="small-button">＋</button><button className="small-button">⛶</button></div></div><div className="tree-legend"><span><i className="legend-line confirmed" />已确认</span><span><i className="legend-line pending" />待确认</span><span className="tree-tip">点击人物查看详细资料</span></div><Tree people={people} selectedId={selected?.id} onSelect={onSelect} /></div><PersonPanel person={selected} people={people} onEdit={onEdit} /></section>
     <section className="bottom-grid"><div className="panel activity-panel"><div className="panel-header"><div><span className="eyebrow">档案状态</span><h2>从祖源线索开始建谱</h2></div><button className="text-button">查看资料 →</button></div><div className="activity-list"><Activity icon="⌖" color="blue" title="已记录祖籍地点" detail={familyProfile.origin} time="今天" /><Activity icon="◷" color="orange" title="始迁祖待考" detail="需要家人提供姓名、字辈与原始家谱线索" time="待补" /><Activity icon="◌" color="purple" title="待收集原始资料" detail="家谱原件、墓碑照片、口述录音或老户口簿" time="待补" /></div></div><div className="panel quote-panel"><div className="quote-mark">“</div><p>先把能确认的<br /><em>一笔一画</em>留下来。</p><span>— 小石口家族档案</span><div className="quote-shape" /></div></section>
   </div>
 }

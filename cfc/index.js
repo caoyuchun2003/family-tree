@@ -14,10 +14,12 @@ exports.handler = function handler(event) {
 
   let rawPath = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '/api/people'
   rawPath = rawPath.replace(/^\/api/, '') || '/people'
+  const pathOnly = rawPath.split('?')[0]
   if (event.rawQueryString) rawPath += `?${event.rawQueryString}`
 
-  if (rawPath === '/login') return Promise.resolve(login(event))
-  if (!isAuthenticated(event)) return Promise.resolve(response(401, JSON.stringify({ error: 'unauthorized' })))
+  if (pathOnly === '/login') return Promise.resolve(login(event))
+  const isPublicRead = method === 'GET' && pathOnly === '/people'
+  if (!isPublicRead && !isAuthenticated(event)) return Promise.resolve(response(401, JSON.stringify({ error: 'unauthorized' })))
 
   const target = new URL(`${base}${rawPath}`)
   const payload = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, 'base64') : Buffer.from(event.body)) : null

@@ -103,6 +103,11 @@ async function updateFunction() {
   return updateConfiguration(variables)
 }
 
+async function publishCode() {
+  const zip = fs.readFileSync(process.env.CFC_ZIP || '/private/tmp/family-tree-cfc.zip').toString('base64')
+  return request('PUT', `/v1/functions/${encode(FUNCTION_NAME)}/code`, '', JSON.stringify({ ZipFile: zip, Publish: true, DryRun: false }))
+}
+
 async function updateConfigurationFromEnvironment() {
   const internalKey = process.env.FAMILY_TREE_INTERNAL_KEY || (process.env.FAMILY_TREE_INTERNAL_KEY_FILE ? fs.readFileSync(process.env.FAMILY_TREE_INTERNAL_KEY_FILE, 'utf8').trim() : '')
   if (!internalKey) throw new Error('FAMILY_TREE_INTERNAL_KEY or FAMILY_TREE_INTERNAL_KEY_FILE is required')
@@ -170,6 +175,9 @@ if (command === 'list') {
 } else if (command === 'configure') {
   const functionInfo = await updateFunction()
   console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'configured', version: functionInfo.Version || '$LATEST' }))
+} else if (command === 'publish-code') {
+  const functionInfo = await publishCode()
+  console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'code-published', version: functionInfo.Version || '$LATEST' }))
 } else if (command === 'configure-env') {
   const functionInfo = await updateConfigurationFromEnvironment()
   console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'environment-configured', version: functionInfo.Version || '$LATEST' }))

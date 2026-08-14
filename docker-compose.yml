@@ -10,3 +10,18 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     volumes:
       - ./data:/data/genealogy
+    ports:
+      - "18091:18091"
+    networks:
+      default: {}
+      proxy:
+        aliases:
+          - family-tree-api
+
+networks:
+  default:
+    external: true
+    name: family-tree_default
+  proxy:
+    external: true
+    name: podman

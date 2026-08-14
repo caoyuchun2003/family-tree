@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createPerson, getPeople, hasRemoteApi } from './api'
+import { clearSession, createPerson, getPeople, hasRemoteApi, hasSession, login } from './api'
 import { sourceMaterials } from './data'
 
 const navItems = [
@@ -22,13 +22,24 @@ function App() {
   const [showModal, setShowModal] = useState(false)
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
+  const [authenticated, setAuthenticated] = useState(() => !hasRemoteApi() || hasSession())
 
   useEffect(() => {
+    if (hasRemoteApi() && !authenticated) {
+      setLoading(false)
+      return undefined
+    }
+    setLoading(true)
     getPeople()
       .then(setPeople)
-      .catch(() => setToast('数据加载失败，当前显示演示数据'))
+      .catch((error) => {
+        if (error.status === 401) {
+          clearSession()
+          setAuthenticated(false)
+        } else setToast(error.message || '数据加载失败')
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [authenticated])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -60,11 +71,16 @@ function App() {
       setShowModal(false)
       setToast('已添加成员，等待审核')
     } catch (error) {
+      if (error.status === 401) {
+        clearSession()
+        setAuthenticated(false)
+      }
       setToast(error.message)
     }
   }
 
   if (loading) return <div className="loading-screen"><div className="brand-mark">谱</div><p>正在打开家谱...</p></div>
+  if (hasRemoteApi() && !authenticated) return <LoginScreen onLogin={async (code) => { await login(code); setAuthenticated(true) }} />
 
   return (
     <div className="app-shell">
@@ -90,6 +106,19 @@ function App() {
       {showModal && <AddPersonModal onClose={() => setShowModal(false)} onSubmit={handleCreate} />}
     </div>
   )
+}
+
+function LoginScreen({ onLogin }) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  async function submit(event) {
+    event.preventDefault()
+    setSubmitting(true)
+    setError('')
+    try { await onLogin(code.trim()) } catch (loginError) { setError(loginError.message) } finally { setSubmitting(false) }
+  }
+  return <div className="login-screen"><div className="login-card"><div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div><span className="eyebrow warm">曹氏家谱 · 家人专用</span><h1>欢迎回到家族档案</h1><p>请输入家族访问口令，进入家谱和资料库。</p><form onSubmit={submit}><label>访问口令<input autoFocus type="password" value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入访问口令" required /></label>{error && <div className="login-error">{error}</div>}<button className="primary-button login-button" disabled={submitting}>{submitting ? '验证中…' : '进入家谱'}</button></form><small>口令由家谱管理员保管，不会写入网页代码。</small></div></div>
 }
 
 function Overview({ people, selected, pending, onSelect, onAdd }) {

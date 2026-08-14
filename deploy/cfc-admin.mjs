@@ -59,8 +59,8 @@ async function listFunctions() {
 async function createFunction() {
   const existing = (await listFunctions()).find((item) => item.FunctionName === FUNCTION_NAME)
   if (existing) return existing
-  const keyFile = process.env.FAMILY_TREE_INTERNAL_KEY_FILE
-  if (!keyFile) throw new Error('FAMILY_TREE_INTERNAL_KEY_FILE is required')
+  const internalKey = process.env.FAMILY_TREE_INTERNAL_KEY || (process.env.FAMILY_TREE_INTERNAL_KEY_FILE ? fs.readFileSync(process.env.FAMILY_TREE_INTERNAL_KEY_FILE, 'utf8').trim() : '')
+  if (!internalKey) throw new Error('FAMILY_TREE_INTERNAL_KEY or FAMILY_TREE_INTERNAL_KEY_FILE is required')
   const body = JSON.stringify({
     Code: { ZipFile: fs.readFileSync(process.env.CFC_ZIP || '/private/tmp/family-tree-cfc.zip').toString('base64'), Publish: true, DryRun: false },
     Description: '家谱网站 API proxy to the family-tree server',
@@ -71,11 +71,28 @@ async function createFunction() {
     MemorySize: 128,
     Environment: { Variables: {
       SERVER_API_BASE_URL: process.env.SERVER_API_BASE_URL || 'http://180.76.180.105/genealogy/api',
-      INTERNAL_API_KEY: fs.readFileSync(keyFile, 'utf8').trim(),
+      INTERNAL_API_KEY: internalKey,
       CORS_ORIGIN: process.env.CORS_ORIGIN || 'https://caoyuchun2003.github.io',
+      FAMILY_ACCESS_CODE: process.env.FAMILY_ACCESS_CODE || '',
+      AUTH_SECRET: process.env.AUTH_SECRET || '',
     }},
   })
   return request('POST', '/v1/functions', '', body)
+}
+
+async function updateFunction() {
+  const internalKey = process.env.FAMILY_TREE_INTERNAL_KEY || (process.env.FAMILY_TREE_INTERNAL_KEY_FILE ? fs.readFileSync(process.env.FAMILY_TREE_INTERNAL_KEY_FILE, 'utf8').trim() : '')
+  if (!internalKey || !process.env.FAMILY_ACCESS_CODE || !process.env.AUTH_SECRET) throw new Error('FAMILY_TREE_INTERNAL_KEY, FAMILY_ACCESS_CODE and AUTH_SECRET are required')
+  const zip = fs.readFileSync(process.env.CFC_ZIP || '/private/tmp/family-tree-cfc.zip').toString('base64')
+  const variables = {
+    SERVER_API_BASE_URL: process.env.SERVER_API_BASE_URL || 'http://180.76.180.105/genealogy/api',
+    INTERNAL_API_KEY: internalKey,
+    CORS_ORIGIN: process.env.CORS_ORIGIN || 'https://caoyuchun2003.github.io',
+    FAMILY_ACCESS_CODE: process.env.FAMILY_ACCESS_CODE,
+    AUTH_SECRET: process.env.AUTH_SECRET,
+  }
+  await request('PUT', `/v1/functions/${encode(FUNCTION_NAME)}/code`, '', JSON.stringify({ ZipFile: zip, Publish: true, DryRun: false }))
+  return request('PUT', `/v1/functions/${encode(FUNCTION_NAME)}/configuration`, '', JSON.stringify({ FunctionName: FUNCTION_NAME, Handler: 'index.handler', Runtime: 'nodejs12', MemorySize: 128, Timeout: 10, Environment: { Variables: variables } }))
 }
 
 async function createTrigger(functionBrn) {
@@ -90,15 +107,32 @@ async function createTrigger(functionBrn) {
   }))
 }
 
+function triggerData(trigger) {
+  return trigger.Data || trigger.Relation?.[0]?.Data || trigger.data || {}
+}
+
+function endpointPrefix(data) {
+  return data.EndpointPrefix || data.endpointPrefix || data.Endpoint || data.endpoint || data.URL || data.Url || ''
+}
+
 const command = process.argv[2] || 'deploy'
 if (command === 'list') {
   for (const item of await listFunctions()) console.log(JSON.stringify({ name: item.FunctionName, brn: item.FunctionBrn }))
 } else if (command === 'create') {
   const functionInfo = await createFunction()
   console.log(JSON.stringify({ function: functionInfo.FunctionName, brn: functionInfo.FunctionBrn }))
+} else if (command === 'configure') {
+  const functionInfo = await updateFunction()
+  console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'configured', version: functionInfo.Version || '$LATEST' }))
+} else if (command === 'inspect') {
+  const functionInfo = (await listFunctions()).find((item) => item.FunctionName === FUNCTION_NAME)
+  if (!functionInfo) throw new Error(`function not found: ${FUNCTION_NAME}`)
+  const trigger = await createTrigger(functionInfo.FunctionBrn)
+  console.log(JSON.stringify({ function: FUNCTION_NAME, trigger }))
 } else {
   const functionInfo = await createFunction()
   const trigger = await createTrigger(functionInfo.FunctionBrn)
-  const data = trigger.Data || trigger.Relation?.[0]?.Data || {}
-  console.log(JSON.stringify({ function: functionInfo.FunctionName, endpoint: data.EndpointPrefix, resourcePath: data.ResourcePath, apiBaseUrl: `${data.EndpointPrefix}/api` }))
+  const data = triggerData(trigger)
+  const endpoint = endpointPrefix(data)
+  console.log(JSON.stringify({ function: functionInfo.FunctionName, endpoint, resourcePath: data.ResourcePath, apiBaseUrl: endpoint ? `${endpoint}/api` : '' }))
 }

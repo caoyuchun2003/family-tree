@@ -15,5 +15,5 @@ tar -czf "$TARBALL" \
   backend docker-compose.yml
 
 scp "$TARBALL" "$REMOTE_HOST:/tmp/family-tree-api-deploy.tar.gz"
-ssh "$REMOTE_HOST" "mkdir -p '$APP_DIR'; tar -xzf /tmp/family-tree-api-deploy.tar.gz -C '$APP_DIR'; mkdir -p '$APP_DIR/data'; cd '$APP_DIR'; podman-compose up -d --build api; podman exec family-tree-api python -c 'import urllib.request; print(urllib.request.urlopen(\"http://127.0.0.1:18091/health\").read().decode())'"
+ssh "$REMOTE_HOST" "mkdir -p '$APP_DIR'; tar -xzf /tmp/family-tree-api-deploy.tar.gz -C '$APP_DIR'; mkdir -p '$APP_DIR/data'; cd '$APP_DIR'; podman rm -f family-tree-api 2>/dev/null || true; podman-compose up -d --build api; podman exec family-tree-api python -c 'import urllib.request; print(urllib.request.urlopen(\"http://127.0.0.1:18091/health\").read().decode())'"
 echo "API deployed to $REMOTE_HOST:$APP_DIR"

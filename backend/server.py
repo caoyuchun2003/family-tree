@@ -82,6 +82,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send({"ok": True, "service": "family-tree-api"})
             return
         if path == "/people":
+            if not self._authorized():
+                self._send({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+                return
             with connect_db() as connection:
                 people = [row_to_person(row) for row in connection.execute("SELECT * FROM people ORDER BY generation, id")]
             self._send(people)

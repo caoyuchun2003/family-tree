@@ -8,12 +8,18 @@ const https = require('https')
 // Public reads remain available even when the private server route is unreachable.
 // This mirrors the six real nodes currently transcribed from the Xiaoshikou image.
 const PUBLIC_PEOPLE = [
-  { id: 'cao-jianlie', name: '曹建列', generation: 1, branch: '手绘图主线', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名与曹立中的父子连线来自手绘世系图，年代、籍贯和是否为小石口始迁祖待家人核对。', parentIds: [] },
+  { id: 'cao-tongxiu', name: '曹同休', generation: 0, branch: '手绘图主线', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名与曹建列的上方连线来自第二张放大图，字形和父子关系待家人复核。', parentIds: [] },
+  { id: 'cao-jianlie', name: '曹建列', generation: 1, branch: '手绘图主线', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名与曹立中的父子连线来自手绘世系图，年代、籍贯和是否为小石口始迁祖待家人核对。', parentIds: ['cao-tongxiu'] },
   { id: 'cao-lizhong', name: '曹立中', generation: 2, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '手绘图中位于曹建列下方的主节点。', parentIds: ['cao-jianlie'] },
   { id: 'cao-yushan', name: '曹裕善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
   { id: 'cao-haoshan', name: '曹好善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
   { id: 'cao-wangshan', name: '曹王善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
   { id: 'cao-bingshan', name: '曹秉善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
+  { id: 'cao-baozhong', name: '曹宝中', generation: 2, branch: '建列房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '第二张放大图中位于曹建列下方的主节点，字形和连线待家人复核。', parentIds: ['cao-jianlie'] },
+  { id: 'cao-fushan', name: '曹福善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
+  { id: 'cao-wanshan', name: '曹万善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
+  { id: 'cao-rongshan', name: '曹荣善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
+  { id: 'cao-lianshan', name: '曹连善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
 ]
 
 exports.handler = function handler(event) {

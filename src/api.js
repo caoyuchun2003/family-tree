@@ -1,13 +1,13 @@
 import { initialPeople } from './data'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const STORAGE_KEY = 'family-tree.people.v2'
-const LEGACY_STORAGE_KEY = 'family-tree.people.v1'
+const STORAGE_KEY = 'family-tree.people.v3'
+const LEGACY_STORAGE_KEYS = ['family-tree.people.v1', 'family-tree.people.v2']
 const TOKEN_KEY = 'family-tree.api-token.v1'
 const LOCAL_EDITOR_HASH = '8f21a4cdd714d7bd887029d11c19e84622b57f2415dfe1b4a841e47f8a9c6237'
 
 // 清理旧版山东平度演示数据；真实手绘图数据使用 v2。
-if (typeof window !== 'undefined') window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+if (typeof window !== 'undefined') LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key))
 
 function localPeople() {
   try {

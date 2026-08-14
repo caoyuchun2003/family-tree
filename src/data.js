@@ -24,6 +24,18 @@ export const familyProfile = {
 
 export const initialPeople = [
   {
+    id: 'cao-tongxiu',
+    name: '曹同休',
+    generation: 0,
+    branch: '手绘图主线',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名与曹建列的上方连线来自第二张放大图，字形和父子关系待家人复核。',
+    parentIds: [],
+  },
+  {
     id: 'cao-jianlie',
     name: '曹建列',
     generation: 1,
@@ -33,7 +45,7 @@ export const initialPeople = [
     location: familyProfile.origin,
     status: '待确认',
     note: '姓名与曹立中的父子连线来自手绘世系图，年代、籍贯和是否为小石口始迁祖待家人核对。',
-    parentIds: [],
+    parentIds: ['cao-tongxiu'],
   },
   {
     id: 'cao-lizhong',
@@ -63,6 +75,35 @@ export const initialPeople = [
     status: '待确认',
     note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。',
     parentIds: ['cao-lizhong'],
+  })),
+  {
+    id: 'cao-baozhong',
+    name: '曹宝中',
+    generation: 2,
+    branch: '建列房',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '第二张放大图中位于曹建列下方的主节点，字形和连线待家人复核。',
+    parentIds: ['cao-jianlie'],
+  },
+  ...[
+    ['cao-fushan', '曹福善'],
+    ['cao-wanshan', '曹万善'],
+    ['cao-rongshan', '曹荣善'],
+    ['cao-lianshan', '曹连善'],
+  ].map(([id, name]) => ({
+    id,
+    name,
+    generation: 3,
+    branch: '宝中房',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。',
+    parentIds: ['cao-baozhong'],
   })),
 ]
 

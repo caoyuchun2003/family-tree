@@ -1,0 +1,19 @@
+# family-tree-edge.service
+[Unit]
+Description=Family tree edge proxy container
+Wants=network-online.target
+After=network-online.target container-portainer.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+TimeoutStopSec=70
+ExecStartPre=/bin/rm -f %t/%n.ctr-id
+ExecStart=/usr/bin/podman run --cidfile=%t/%n.ctr-id --sdnotify=conmon --cgroups=no-conmon --replace -d --name family-tree-edge --network podman --network family-tree_default -p 9000:80 -v /opt/apps/family-tree-edge/nginx.conf:/etc/nginx/nginx.conf:ro docker.io/library/nginx:alpine
+ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
+ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
+Type=notify
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target default.target

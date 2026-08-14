@@ -16,10 +16,18 @@ function encode(value) {
 function sign(method, path, query = '') {
   const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   const prefix = `bce-auth-v1/${accessKey}/${timestamp}/1800`
-  const canonical = `${method}\n${path}\n${query}\nhost:${encode(CFC_HOST)}`
+  const canonical = `${method}\n${path}\n${canonicalQuery(query)}\nhost:${encode(CFC_HOST)}`
   const signingKey = crypto.createHmac('sha256', secretKey).update(prefix).digest('hex')
   const signature = crypto.createHmac('sha256', signingKey).update(canonical).digest('hex')
   return `${prefix}/host/${signature}`
+}
+
+function canonicalQuery(query) {
+  if (!query) return ''
+  return query.split('&').filter(Boolean).map((part) => {
+    const [key, ...rest] = part.split('=')
+    return [decodeURIComponent(key), decodeURIComponent(rest.join('='))]
+  }).sort(([left], [right]) => left.localeCompare(right)).map(([key, value]) => `${encode(key)}=${encode(value)}`).join('&')
 }
 
 function request(method, path, query = '', body = '') {
@@ -97,13 +105,15 @@ async function updateFunction() {
 
 async function updateConfigurationFromEnvironment() {
   const internalKey = process.env.FAMILY_TREE_INTERNAL_KEY || (process.env.FAMILY_TREE_INTERNAL_KEY_FILE ? fs.readFileSync(process.env.FAMILY_TREE_INTERNAL_KEY_FILE, 'utf8').trim() : '')
-  if (!internalKey || !process.env.FAMILY_ACCESS_CODE || !process.env.AUTH_SECRET) throw new Error('FAMILY_TREE_INTERNAL_KEY, FAMILY_ACCESS_CODE and AUTH_SECRET are required')
+  if (!internalKey) throw new Error('FAMILY_TREE_INTERNAL_KEY or FAMILY_TREE_INTERNAL_KEY_FILE is required')
+  const current = (await getConfiguration()).Environment?.Variables || {}
   return updateConfiguration({
+    ...current,
     SERVER_API_BASE_URL: process.env.SERVER_API_BASE_URL || 'http://180.76.180.105/genealogy/api',
     INTERNAL_API_KEY: internalKey,
     CORS_ORIGIN: process.env.CORS_ORIGIN || 'https://caoyuchun2003.github.io',
-    FAMILY_ACCESS_CODE: process.env.FAMILY_ACCESS_CODE,
-    AUTH_SECRET: process.env.AUTH_SECRET,
+    ...(process.env.FAMILY_ACCESS_CODE ? { FAMILY_ACCESS_CODE: process.env.FAMILY_ACCESS_CODE } : {}),
+    ...(process.env.AUTH_SECRET ? { AUTH_SECRET: process.env.AUTH_SECRET } : {}),
   })
 }
 
@@ -125,6 +135,21 @@ async function createTrigger(functionBrn) {
     Source: 'cfc-http-trigger/v1/CFCAPI',
     Data: { AuthType: 'anonymous', Method: 'GET,POST,OPTIONS', ResourcePath: '/api/{proxy+}' },
   }))
+}
+
+async function deleteTrigger() {
+  const functionInfo = (await listFunctions()).find((item) => item.FunctionName === FUNCTION_NAME)
+  if (!functionInfo) throw new Error(`function not found: ${FUNCTION_NAME}`)
+  const relations = (await request('GET', '/v1/relation', `FunctionBrn=${encode(functionInfo.FunctionBrn)}`)).Relation || []
+  const existing = relations.find((relation) => {
+    const data = triggerData(relation)
+    return data.ResourcePath === '/api/{proxy+}'
+  })
+  if (!existing) return { function: FUNCTION_NAME, status: 'no-trigger' }
+  const source = existing.Source || 'cfc-http-trigger/v1/CFCAPI'
+  const query = `Target=${encode(functionInfo.FunctionBrn)}&Source=${encode(source)}&RelationId=${encode(existing.RelationId)}`
+  await request('DELETE', '/v1/relation', query)
+  return { function: FUNCTION_NAME, status: 'trigger-deleted', relationId: existing.RelationId }
 }
 
 function triggerData(trigger) {
@@ -152,6 +177,8 @@ if (command === 'list') {
   const config = await getConfiguration()
   const variables = config.Environment?.Variables || {}
   console.log(JSON.stringify({ function: FUNCTION_NAME, environmentKeys: Object.keys(variables), runtime: config.Runtime, handler: config.Handler, version: config.Version }))
+} else if (command === 'delete-trigger') {
+  console.log(JSON.stringify(await deleteTrigger()))
 } else if (command === 'inspect') {
   const functionInfo = (await listFunctions()).find((item) => item.FunctionName === FUNCTION_NAME)
   if (!functionInfo) throw new Error(`function not found: ${FUNCTION_NAME}`)

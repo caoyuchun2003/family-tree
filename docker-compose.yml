@@ -1,0 +1,12 @@
+services:
+  api:
+    build: ./backend
+    container_name: family-tree-api
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data/genealogy
+      PORT: 18091
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    volumes:
+      - ./data:/data/genealogy

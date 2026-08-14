@@ -106,6 +106,21 @@ export const initialPeople = [
     parentIds: ['cao-baozhong'],
   })),
   ...[
+    ['cao-xiangzhong', '曹祥中', null],
+    ['cao-qishan', '曹祺善', 'cao-xiangzhong'],
+  ].map(([id, name, parentId]) => ({
+    id,
+    name,
+    generation: parentId ? 3 : 2,
+    branch: '祥中房·待核',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名来自第三张放大图，曹祺善与曹祥中的连线及上游世系待家人复核。',
+    parentIds: parentId ? [parentId] : [],
+  })),
+  ...[
     ['cao-jiuzhong', '曹九重', 'cao-yushan'],
     ['cao-jiuxu-shu', '曹九续', 'cao-yushan'],
     ['cao-jiugong', '曹九工', 'cao-haoshan'],

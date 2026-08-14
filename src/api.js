@@ -12,7 +12,8 @@ if (typeof window !== 'undefined') window.localStorage.removeItem(LEGACY_STORAGE
 function localPeople() {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY)
-    return saved ? JSON.parse(saved) : initialPeople
+    const parsed = saved ? JSON.parse(saved) : null
+    return Array.isArray(parsed) && parsed.length ? parsed : initialPeople
   } catch {
     return initialPeople
   }

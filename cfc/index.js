@@ -5,12 +5,20 @@ const crypto = require('crypto')
 const http = require('http')
 const https = require('https')
 
+// Public reads remain available even when the private server route is unreachable.
+// This mirrors the six real nodes currently transcribed from the Xiaoshikou image.
+const PUBLIC_PEOPLE = [
+  { id: 'cao-jianlie', name: '曹建列', generation: 1, branch: '手绘图主线', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名与曹立中的父子连线来自手绘世系图，年代、籍贯和是否为小石口始迁祖待家人核对。', parentIds: [] },
+  { id: 'cao-lizhong', name: '曹立中', generation: 2, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '手绘图中位于曹建列下方的主节点。', parentIds: ['cao-jianlie'] },
+  { id: 'cao-yushan', name: '曹裕善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
+  { id: 'cao-haoshan', name: '曹好善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
+  { id: 'cao-wangshan', name: '曹王善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
+  { id: 'cao-bingshan', name: '曹秉善', generation: 3, branch: '立中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。', parentIds: ['cao-lizhong'] },
+]
+
 exports.handler = function handler(event) {
   const method = event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || 'GET'
   if (method === 'OPTIONS') return Promise.resolve(response(204, ''))
-
-  const base = (process.env.SERVER_API_BASE_URL || '').replace(/\/$/, '')
-  if (!base) return Promise.resolve(response(500, JSON.stringify({ error: 'SERVER_API_BASE_URL is not configured' })))
 
   let rawPath = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '/api/people'
   rawPath = rawPath.replace(/^\/api/, '') || '/people'
@@ -19,7 +27,11 @@ exports.handler = function handler(event) {
 
   if (pathOnly === '/login') return Promise.resolve(login(event))
   const isPublicRead = method === 'GET' && pathOnly === '/people'
+  if (isPublicRead) return Promise.resolve(response(200, JSON.stringify(PUBLIC_PEOPLE)))
   if (!isPublicRead && !isAuthenticated(event)) return Promise.resolve(response(401, JSON.stringify({ error: 'unauthorized' })))
+
+  const base = (process.env.SERVER_API_BASE_URL || '').replace(/\/$/, '')
+  if (!base) return Promise.resolve(response(500, JSON.stringify({ error: 'SERVER_API_BASE_URL is not configured' })))
 
   const target = new URL(`${base}${rawPath}`)
   const payload = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, 'base64') : Buffer.from(event.body)) : null

@@ -92,7 +92,27 @@ async function updateFunction() {
     AUTH_SECRET: process.env.AUTH_SECRET,
   }
   await request('PUT', `/v1/functions/${encode(FUNCTION_NAME)}/code`, '', JSON.stringify({ ZipFile: zip, Publish: true, DryRun: false }))
+  return updateConfiguration(variables)
+}
+
+async function updateConfigurationFromEnvironment() {
+  const internalKey = process.env.FAMILY_TREE_INTERNAL_KEY || (process.env.FAMILY_TREE_INTERNAL_KEY_FILE ? fs.readFileSync(process.env.FAMILY_TREE_INTERNAL_KEY_FILE, 'utf8').trim() : '')
+  if (!internalKey || !process.env.FAMILY_ACCESS_CODE || !process.env.AUTH_SECRET) throw new Error('FAMILY_TREE_INTERNAL_KEY, FAMILY_ACCESS_CODE and AUTH_SECRET are required')
+  return updateConfiguration({
+    SERVER_API_BASE_URL: process.env.SERVER_API_BASE_URL || 'http://180.76.180.105/genealogy/api',
+    INTERNAL_API_KEY: internalKey,
+    CORS_ORIGIN: process.env.CORS_ORIGIN || 'https://caoyuchun2003.github.io',
+    FAMILY_ACCESS_CODE: process.env.FAMILY_ACCESS_CODE,
+    AUTH_SECRET: process.env.AUTH_SECRET,
+  })
+}
+
+function updateConfiguration(variables) {
   return request('PUT', `/v1/functions/${encode(FUNCTION_NAME)}/configuration`, '', JSON.stringify({ FunctionName: FUNCTION_NAME, Handler: 'index.handler', Runtime: 'nodejs12', MemorySize: 128, Timeout: 10, Environment: { Variables: variables } }))
+}
+
+async function getConfiguration() {
+  return request('GET', `/v1/functions/${encode(FUNCTION_NAME)}/configuration`)
 }
 
 async function createTrigger(functionBrn) {
@@ -108,7 +128,8 @@ async function createTrigger(functionBrn) {
 }
 
 function triggerData(trigger) {
-  return trigger.Data || trigger.Relation?.[0]?.Data || trigger.data || {}
+  const relation = trigger.Relation
+  return trigger.Data || (Array.isArray(relation) ? relation[0]?.Data : relation?.Data) || trigger.data || {}
 }
 
 function endpointPrefix(data) {
@@ -124,6 +145,13 @@ if (command === 'list') {
 } else if (command === 'configure') {
   const functionInfo = await updateFunction()
   console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'configured', version: functionInfo.Version || '$LATEST' }))
+} else if (command === 'configure-env') {
+  const functionInfo = await updateConfigurationFromEnvironment()
+  console.log(JSON.stringify({ function: FUNCTION_NAME, status: 'environment-configured', version: functionInfo.Version || '$LATEST' }))
+} else if (command === 'getconfig') {
+  const config = await getConfiguration()
+  const variables = config.Environment?.Variables || {}
+  console.log(JSON.stringify({ function: FUNCTION_NAME, environmentKeys: Object.keys(variables), runtime: config.Runtime, handler: config.Handler, version: config.Version }))
 } else if (command === 'inspect') {
   const functionInfo = (await listFunctions()).find((item) => item.FunctionName === FUNCTION_NAME)
   if (!functionInfo) throw new Error(`function not found: ${FUNCTION_NAME}`)

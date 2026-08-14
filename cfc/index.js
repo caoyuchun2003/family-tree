@@ -67,7 +67,8 @@ function login(event) {
 }
 
 function isAuthenticated(event) {
-  const authorization = event.headers?.Authorization || event.headers?.authorization || ''
+  const headers = event.headers || {}
+  const authorization = headers.Authorization || headers.authorization || ''
   const token = authorization.replace(/^Bearer\s+/i, '')
   const [encoded, signature] = token.split('.')
   const secret = process.env.AUTH_SECRET || ''

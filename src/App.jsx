@@ -16,7 +16,7 @@ function getTreeLayout(people) {
   generations.forEach((generation, generationIndex) => {
     const group = people.filter((person) => person.generation === generation)
     group.forEach((person, index) => {
-      const y = group.length === 1 ? 44 : 18 + (index * 64) / (group.length - 1)
+      const y = group.length === 1 ? 50 : 8 + (index * 84) / (group.length - 1)
       positions[person.id] = [6 + (generationIndex * 80) / maxGeneration, y]
     })
   })
@@ -33,6 +33,8 @@ function App() {
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(() => hasSession())
+  const [treeZoom, setTreeZoom] = useState(0.9)
+  const [treeFullscreen, setTreeFullscreen] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -120,7 +122,7 @@ function App() {
       <main className="main-content">
         <header className="topbar"><div className="breadcrumb"><span>我的家谱</span><b>/</b><strong>{navItems.find((item) => item.id === active)?.label}</strong></div><div className="top-actions"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、分支或地点" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="通知">♢<i /></button><button className="primary-button" onClick={() => requestEditor('add')}><span>＋</span> 添加成员</button></div></header>
 
-        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => requestEditor('add')} onEdit={() => requestEditor('edit')} />}
+        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => requestEditor('add')} onEdit={() => requestEditor('edit')} treeZoom={treeZoom} onTreeZoomChange={setTreeZoom} treeFullscreen={treeFullscreen} onTreeFullscreenChange={setTreeFullscreen} />}
         {active === 'members' && <Members people={filteredPeople} query={query} onSelect={(id) => { setSelectedId(id); setActive('overview') }} onAdd={() => requestEditor('add')} />}
         {active === 'materials' && <Materials />}
         {active === 'review' && <Review pending={pending} onSelect={(id) => { setSelectedId(id); setActive('overview') }} />}
@@ -146,26 +148,29 @@ function LoginScreen({ onClose, onLogin }) {
   return <div className="login-screen" onMouseDown={onClose}><div className="login-card" onMouseDown={(event) => event.stopPropagation()}><button className="close-login" type="button" onClick={onClose}>×</button><div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div><span className="eyebrow warm">曹氏家谱 · 编辑权限</span><h1>验证后编辑家谱</h1><p>浏览家谱无需口令，新增或修改资料前请输入编辑口令。</p><form onSubmit={submit}><label>编辑口令<input autoFocus type="password" value={code} onChange={(event) => setCode(event.target.value)} placeholder="请输入编辑口令" required /></label>{error && <div className="login-error">{error}</div>}<button className="primary-button login-button" disabled={submitting}>{submitting ? '验证中…' : '验证编辑权限'}</button></form><small>口令由家谱管理员保管。</small></div></div>
 }
 
-function Overview({ people, selected, pending, onSelect, onAdd, onEdit }) {
+function Overview({ people, selected, pending, onSelect, onAdd, onEdit, treeZoom, onTreeZoomChange, treeFullscreen, onTreeFullscreenChange }) {
   const generations = new Set(people.map((person) => person.generation)).size
   return <div className="page-wrap">
     <section className="welcome"><div><span className="eyebrow warm">{familyProfile.subtitle} · 2026 年 08 月更新</span><h1>把小石口的<em>家族根脉</em>留下来。</h1><p>目前已记录祖籍地点，姓名、字辈和世系只依据家谱原件与家人核对后入档。</p></div><div className="welcome-actions"><button className="secondary-button" onClick={() => window.alert('请先收集家谱原件、墓碑照片或家人口述资料')}>⇧ 导入资料</button><button className="primary-button" onClick={onAdd}><span>＋</span> 添加成员</button></div></section>
     <section className="stats-grid"><Stat label="已录入档案" value={people.length} suffix="条" trend="含 1 条祖源待考节点" icon="♧" tone="blue" /><Stat label="记录世代" value={generations} suffix="代" trend="具体世系尚未确认" icon="⌁" tone="orange" /><Stat label="待确认信息" value={pending.length} suffix="条" trend="需要家人共同核对" icon="◷" tone="purple" /><Stat label="资料完整度" value={familyProfile.completeness} suffix="%" trend="先补原始家谱与字辈" icon="◌" tone="green" /></section>
-    <section className="content-grid"><div className="panel tree-panel"><div className="panel-header"><div><span className="eyebrow">关系图谱</span><h2>家族脉络</h2></div><div className="panel-tools"><span className="live-dot">● 实时预览</span><button className="small-button">−</button><span className="zoom-value">100%</span><button className="small-button">＋</button><button className="small-button">⛶</button></div></div><div className="tree-legend"><span><i className="legend-line confirmed" />已确认</span><span><i className="legend-line pending" />待确认</span><span className="tree-tip">点击人物查看详细资料</span></div><Tree people={people} selectedId={selected?.id} onSelect={onSelect} /></div><PersonPanel person={selected} people={people} onEdit={onEdit} /></section>
+    <section className="content-grid"><div className={`panel tree-panel ${treeFullscreen ? 'tree-panel-fullscreen' : ''}`}><div className="panel-header"><div><span className="eyebrow">关系图谱</span><h2>家族脉络</h2></div><div className="panel-tools"><span className="live-dot">● 实时预览</span><button className="small-button" type="button" aria-label="缩小关系图" onClick={() => onTreeZoomChange(Math.max(0.5, Number((treeZoom - 0.1).toFixed(1))))}>−</button><span className="zoom-value">{Math.round(treeZoom * 100)}%</span><button className="small-button" type="button" aria-label="放大关系图" onClick={() => onTreeZoomChange(Math.min(1.5, Number((treeZoom + 0.1).toFixed(1))))}>＋</button><button className="small-button" type="button" aria-label={treeFullscreen ? '退出全屏' : '全屏显示'} onClick={() => onTreeFullscreenChange(!treeFullscreen)}>{treeFullscreen ? '×' : '⛶'}</button></div></div><div className="tree-legend"><span><i className="legend-line confirmed" />已确认</span><span><i className="legend-line pending" />待确认</span><span className="tree-tip">点击人物查看详细资料</span></div><Tree people={people} selectedId={selected?.id} onSelect={onSelect} zoom={treeZoom} /></div><PersonPanel person={selected} people={people} onEdit={onEdit} /></section>
     <section className="bottom-grid"><div className="panel activity-panel"><div className="panel-header"><div><span className="eyebrow">档案状态</span><h2>从祖源线索开始建谱</h2></div><button className="text-button">查看资料 →</button></div><div className="activity-list"><Activity icon="⌖" color="blue" title="已记录祖籍地点" detail={familyProfile.origin} time="今天" /><Activity icon="◷" color="orange" title="始迁祖待考" detail="需要家人提供姓名、字辈与原始家谱线索" time="待补" /><Activity icon="◌" color="purple" title="待收集原始资料" detail="家谱原件、墓碑照片、口述录音或老户口簿" time="待补" /></div></div><div className="panel quote-panel"><div className="quote-mark">“</div><p>先把能确认的<br /><em>一笔一画</em>留下来。</p><span>— 小石口家族档案</span><div className="quote-shape" /></div></section>
   </div>
 }
 
-function Tree({ people, selectedId, onSelect }) {
+function Tree({ people, selectedId, onSelect, zoom }) {
   const { generations, positions } = getTreeLayout(people)
   const visible = people.filter((person) => positions[person.id])
+  const maxGroupSize = Math.max(...generations.map((generation) => people.filter((person) => person.generation === generation).length), 1)
+  const stageWidth = Math.max(900, generations.length * 220)
+  const stageHeight = Math.max(520, maxGroupSize * 66 + 100)
   const lines = visible.flatMap((person) => (person.parentIds || []).map((parentId) => {
     const parent = positions[parentId]
     const child = positions[person.id]
     if (!parent || !child) return null
     return <line key={`${parentId}-${person.id}`} x1={`${parent[0] + 14}%`} y1={`${parent[1] + 3}%`} x2={`${child[0]}%`} y2={`${child[1] + 3}%`} />
   }).filter(Boolean))
-  return <div className="tree-canvas"><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels">{generations.map((generation, index) => <span key={generation} style={{ left: `${6 + (index * 80) / Math.max(generations.length - 1, 1)}%` }}>第{generation}世</span>)}</div>{visible.map((person) => { const [left, top] = positions[person.id]; return <button key={person.id} className={`person-node ${person.status === '待确认' ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{person.status === '待确认' && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：已录入世代；待考信息以橙点标记</div></div>
+  return <div className="tree-viewport"><div className="tree-stage-frame" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}><div className="tree-canvas" style={{ width: `${stageWidth}px`, height: `${stageHeight}px`, transform: `scale(${zoom})` }}><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels">{generations.map((generation, index) => <span key={generation} style={{ left: `${6 + (index * 80) / Math.max(generations.length - 1, 1)}%` }}>第{generation}世</span>)}</div>{visible.map((person) => { const [left, top] = positions[person.id]; return <button key={person.id} className={`person-node ${person.status === '待确认' ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{person.status === '待确认' && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：已录入世代；待考信息以橙点标记</div></div></div></div>
 }
 
 function PersonPanel({ person, people, onEdit }) {

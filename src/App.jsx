@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { clearSession, createPerson, getPeople, hasRemoteApi, hasSession, login } from './api'
-import { sourceMaterials } from './data'
+import { familyProfile, sourceMaterials } from './data'
 
 const navItems = [
   { id: 'overview', label: '家谱总览', icon: '⌘' },
@@ -9,9 +9,18 @@ const navItems = [
   { id: 'review', label: '审核中心', icon: '✓', badge: 3 },
 ]
 
-const treePositions = {
-  p1: [6, 44], p2: [25, 30], p3: [25, 65], p4: [45, 20], p5: [45, 42], p6: [45, 70],
-  p7: [66, 13], p8: [66, 29], p9: [66, 51], p10: [86, 10], p11: [86, 28], p12: [86, 50],
+function getTreeLayout(people) {
+  const generations = [...new Set(people.map((person) => person.generation))].sort((a, b) => a - b)
+  const positions = {}
+  const maxGeneration = Math.max(generations.length - 1, 1)
+  generations.forEach((generation, generationIndex) => {
+    const group = people.filter((person) => person.generation === generation)
+    group.forEach((person, index) => {
+      const y = group.length === 1 ? 44 : 18 + (index * 64) / (group.length - 1)
+      positions[person.id] = [6 + (generationIndex * 80) / maxGeneration, y]
+    })
+  })
+  return { generations, positions }
 }
 
 function App() {
@@ -86,11 +95,11 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div>
-        <div className="family-switcher"><span className="eyebrow">当前家谱</span><strong>曹氏家谱</strong><button aria-label="切换家谱">⌄</button></div>
+        <div className="family-switcher"><span className="eyebrow">当前家谱</span><strong>{familyProfile.title}</strong><button aria-label="切换家谱">⌄</button></div>
         <nav className="main-nav" aria-label="主要导航">
           {navItems.map((item) => <button key={item.id} className={active === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setActive(item.id)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}
         </nav>
-        <div className="sidebar-bottom"><div className="sync-status"><span className="status-dot" />{hasRemoteApi() ? '已连接百度云接口' : '本地演示模式'}</div><button className="help-link">？ 使用说明</button><div className="user-chip"><div className="avatar">曹</div><div><strong>家谱管理员</strong><span>管理员权限</span></div><span className="more">•••</span></div></div>
+        <div className="sidebar-bottom"><div className="sync-status"><span className="status-dot" />{hasRemoteApi() ? '已连接百度云接口' : '本地档案模式'}</div><button className="help-link">？ 使用说明</button><div className="user-chip"><div className="avatar">曹</div><div><strong>家谱管理员</strong><span>管理员权限</span></div><span className="more">•••</span></div></div>
       </aside>
 
       <main className="main-content">
@@ -124,22 +133,23 @@ function LoginScreen({ onLogin }) {
 function Overview({ people, selected, pending, onSelect, onAdd }) {
   const generations = new Set(people.map((person) => person.generation)).size
   return <div className="page-wrap">
-    <section className="welcome"><div><span className="eyebrow warm">家族档案 · 2026 年 08 月更新</span><h1>让家族记忆，<em>有迹可循。</em></h1><p>从一张手写家谱开始，把散落在时间里的名字、故事和关系重新连接起来。</p></div><div className="welcome-actions"><button className="secondary-button" onClick={() => window.alert('导入功能将在接入百度云函数后开放')}>⇧ 导入家谱</button><button className="primary-button" onClick={onAdd}><span>＋</span> 添加成员</button></div></section>
-    <section className="stats-grid"><Stat label="家族成员" value={people.length} suffix="人" trend="本家谱已录入" icon="♧" tone="blue" /><Stat label="记录世代" value={generations} suffix="代" trend="从先祖至今" icon="⌁" tone="orange" /><Stat label="待确认信息" value={pending.length} suffix="条" trend="需要家人共同核对" icon="◷" tone="purple" /><Stat label="家谱完整度" value="38" suffix="%" trend="继续补充资料" icon="◌" tone="green" /></section>
+    <section className="welcome"><div><span className="eyebrow warm">{familyProfile.subtitle} · 2026 年 08 月更新</span><h1>把小石口的<em>家族根脉</em>留下来。</h1><p>目前已记录祖籍地点，姓名、字辈和世系只依据家谱原件与家人核对后入档。</p></div><div className="welcome-actions"><button className="secondary-button" onClick={() => window.alert('请先收集家谱原件、墓碑照片或家人口述资料')}>⇧ 导入资料</button><button className="primary-button" onClick={onAdd}><span>＋</span> 添加成员</button></div></section>
+    <section className="stats-grid"><Stat label="已录入档案" value={people.length} suffix="条" trend="含 1 条祖源待考节点" icon="♧" tone="blue" /><Stat label="记录世代" value={generations} suffix="代" trend="具体世系尚未确认" icon="⌁" tone="orange" /><Stat label="待确认信息" value={pending.length} suffix="条" trend="需要家人共同核对" icon="◷" tone="purple" /><Stat label="资料完整度" value={familyProfile.completeness} suffix="%" trend="先补原始家谱与字辈" icon="◌" tone="green" /></section>
     <section className="content-grid"><div className="panel tree-panel"><div className="panel-header"><div><span className="eyebrow">关系图谱</span><h2>家族脉络</h2></div><div className="panel-tools"><span className="live-dot">● 实时预览</span><button className="small-button">−</button><span className="zoom-value">100%</span><button className="small-button">＋</button><button className="small-button">⛶</button></div></div><div className="tree-legend"><span><i className="legend-line confirmed" />已确认</span><span><i className="legend-line pending" />待确认</span><span className="tree-tip">点击人物查看详细资料</span></div><Tree people={people} selectedId={selected?.id} onSelect={onSelect} /></div><PersonPanel person={selected} people={people} onEdit={() => window.alert('编辑表单将在下一步接入')} /></section>
-    <section className="bottom-grid"><div className="panel activity-panel"><div className="panel-header"><div><span className="eyebrow">最近动态</span><h2>家谱正在变得完整</h2></div><button className="text-button">查看全部 →</button></div><div className="activity-list"><Activity icon="＋" color="blue" title="新增成员" detail="曹嘉树 已加入第五世 · 本房" time="刚刚" /><Activity icon="✓" color="green" title="资料确认" detail="曹致远 的出生地已完成核对" time="昨天" /><Activity icon="▧" color="orange" title="上传资料" detail="手写家谱总图 已归档至资料库" time="3 天前" /></div></div><div className="panel quote-panel"><div className="quote-mark">“</div><p>家谱不是一张纸，<br />是我们彼此相认的方式。</p><span>— 家族档案寄语</span><div className="quote-shape" /></div></section>
+    <section className="bottom-grid"><div className="panel activity-panel"><div className="panel-header"><div><span className="eyebrow">档案状态</span><h2>从祖源线索开始建谱</h2></div><button className="text-button">查看资料 →</button></div><div className="activity-list"><Activity icon="⌖" color="blue" title="已记录祖籍地点" detail={familyProfile.origin} time="今天" /><Activity icon="◷" color="orange" title="始迁祖待考" detail="需要家人提供姓名、字辈与原始家谱线索" time="待补" /><Activity icon="◌" color="purple" title="待收集原始资料" detail="家谱原件、墓碑照片、口述录音或老户口簿" time="待补" /></div></div><div className="panel quote-panel"><div className="quote-mark">“</div><p>先把能确认的<br /><em>一笔一画</em>留下来。</p><span>— 小石口家族档案</span><div className="quote-shape" /></div></section>
   </div>
 }
 
 function Tree({ people, selectedId, onSelect }) {
-  const visible = people.filter((person) => treePositions[person.id])
+  const { generations, positions } = getTreeLayout(people)
+  const visible = people.filter((person) => positions[person.id])
   const lines = visible.flatMap((person) => (person.parentIds || []).map((parentId) => {
-    const parent = treePositions[parentId]
-    const child = treePositions[person.id]
+    const parent = positions[parentId]
+    const child = positions[person.id]
     if (!parent || !child) return null
     return <line key={`${parentId}-${person.id}`} x1={`${parent[0] + 14}%`} y1={`${parent[1] + 3}%`} x2={`${child[0]}%`} y2={`${child[1] + 3}%`} />
   }).filter(Boolean))
-  return <div className="tree-canvas"><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels"><span style={{ left: '5%' }}>一世</span><span style={{ left: '24%' }}>二世</span><span style={{ left: '44%' }}>三世</span><span style={{ left: '65%' }}>四世</span><span style={{ left: '85%' }}>五世</span></div>{visible.map((person) => { const [left, top] = treePositions[person.id]; return <button key={person.id} className={`person-node ${person.status === '待确认' ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{person.status === '待确认' && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：第一世至第五世</div></div>
+  return <div className="tree-canvas"><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels">{generations.map((generation, index) => <span key={generation} style={{ left: `${6 + (index * 80) / Math.max(generations.length - 1, 1)}%` }}>第{generation}世</span>)}</div>{visible.map((person) => { const [left, top] = positions[person.id]; return <button key={person.id} className={`person-node ${person.status === '待确认' ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{person.status === '待确认' && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：已录入世代；待考信息以橙点标记</div></div>
 }
 
 function PersonPanel({ person, people, onEdit }) {
@@ -157,7 +167,7 @@ function Members({ people, query, onSelect, onAdd }) {
 }
 
 function Materials() {
-  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">资料库</span><h1>家族资料</h1><p>集中保存原始家谱、口述记录与影像资料。</p></div><button className="primary-button" onClick={() => window.alert('文件上传将在接入百度云服务器后开放')}>⇧ 上传资料</button></section><div className="material-grid">{sourceMaterials.map((material) => <div className="panel material-card" key={material.id}><div className="material-icon">{material.icon}</div><div><span className="material-type">{material.type}</span><h3>{material.title}</h3><p>{material.date}</p></div><span className={`material-state ${material.state === '已归档' ? 'done' : ''}`}>{material.state}</span><button>···</button></div>)}</div><div className="panel empty-material"><div>▧</div><h2>把更多家族记忆放进来</h2><p>上传照片、证件、信件或口述资料，逐步构建完整的家族档案。</p><button className="secondary-button">选择文件</button></div></div>
+  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">资料库</span><h1>家族资料</h1><p>围绕 {familyProfile.origin} 建立可追溯的真实档案。</p></div><button className="primary-button" onClick={() => window.alert('请准备好原始资料后上传：家谱、墓碑、户口簿或口述记录')}>⇧ 上传资料</button></section><div className="material-grid">{sourceMaterials.map((material) => <div className="panel material-card" key={material.id}>{material.asset ? <img className="material-thumb" src={material.asset} alt="手绘曹氏世系图缩略图" /> : <div className="material-icon">{material.icon}</div>}<div><span className="material-type">{material.type}</span><h3>{material.title}</h3><p>{material.date}</p></div><span className={`material-state ${material.state === '已归档' ? 'done' : ''}`}>{material.state}</span><button>···</button></div>)}</div><div className="panel empty-material"><div>▧</div><h2>先收集一手资料</h2><p>上传家谱原件、碑刻照片、老户口簿或家人口述，逐条核实后再扩展世系。</p><button className="secondary-button">选择文件</button></div></div>
 }
 
 function Review({ pending, onSelect }) {

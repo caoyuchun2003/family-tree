@@ -1,20 +1,71 @@
+// 目前只写入已经有来源的祖源线索；未核实的姓名、年代和世系不擅自补写。
+export const familyProfile = {
+  title: '曹氏家谱',
+  shortTitle: '曹氏',
+  subtitle: '山西朔州应县 · 小石口',
+  origin: '山西省朔州市应县南河种镇小石口村',
+  originStatus: '手绘世系图已归档；始迁祖、完整房支与字面仍待核',
+  lastUpdated: '2026-08-14',
+  completeness: 12,
+  sources: [
+    {
+      label: '家族提供的祖籍线索',
+      detail: '“山西朔州应县小石口”',
+      state: '待家人确认',
+    },
+    {
+      label: '公开地名资料',
+      detail: '小石口村隶属应县南河种镇',
+      state: '已记录',
+      url: 'https://www.xzqh.org/html/show/sx/25294.html',
+    },
+  ],
+}
+
 export const initialPeople = [
-  { id: 'p1', name: '曹氏先祖', generation: 1, branch: '本房', gender: '男', years: '约 1890 — 1962', location: '山东平度', status: '已确认', note: '家谱根节点，资料来源为现存手写家谱。', parentIds: [] },
-  { id: 'p2', name: '曹守仁', generation: 2, branch: '本房', gender: '男', years: '1916 — 1988', location: '山东平度', status: '已确认', note: '第二世，家中长子。', parentIds: ['p1'] },
-  { id: 'p3', name: '曹守义', generation: 2, branch: '东支', gender: '男', years: '1920 — 1996', location: '山东平度', status: '待确认', note: '姓名与原图字迹仍需家人核对。', parentIds: ['p1'] },
-  { id: 'p4', name: '曹明远', generation: 3, branch: '本房', gender: '男', years: '1942 — 2015', location: '青岛', status: '已确认', note: '第三世。', parentIds: ['p2'] },
-  { id: 'p5', name: '曹明德', generation: 3, branch: '本房', gender: '男', years: '1948 — 现在', location: '青岛', status: '已确认', note: '第三世。', parentIds: ['p2'] },
-  { id: 'p6', name: '曹明礼', generation: 3, branch: '东支', gender: '男', years: '1951 — 现在', location: '济南', status: '待确认', note: '待补充出生信息。', parentIds: ['p3'] },
-  { id: 'p7', name: '曹致远', generation: 4, branch: '本房', gender: '男', years: '1972 — 现在', location: '北京', status: '已确认', note: '第四世。', parentIds: ['p4'] },
-  { id: 'p8', name: '曹致和', generation: 4, branch: '本房', gender: '男', years: '1977 — 现在', location: '青岛', status: '已确认', note: '第四世。', parentIds: ['p4'] },
-  { id: 'p9', name: '曹安然', generation: 4, branch: '本房', gender: '女', years: '1981 — 现在', location: '上海', status: '已确认', note: '第四世。', parentIds: ['p5'] },
-  { id: 'p10', name: '曹嘉树', generation: 5, branch: '本房', gender: '男', years: '2003 — 现在', location: '北京', status: '待确认', note: '第五世，照片资料待上传。', parentIds: ['p7'] },
-  { id: 'p11', name: '曹知行', generation: 5, branch: '本房', gender: '男', years: '2008 — 现在', location: '青岛', status: '已确认', note: '第五世。', parentIds: ['p8'] },
-  { id: 'p12', name: '曹语桐', generation: 5, branch: '本房', gender: '女', years: '2010 — 现在', location: '上海', status: '已确认', note: '第五世。', parentIds: ['p9'] },
+  {
+    id: 'cao-jianlie',
+    name: '曹建列',
+    generation: 1,
+    branch: '手绘图主线',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名与曹立中的父子连线来自手绘世系图，年代、籍贯和是否为小石口始迁祖待家人核对。',
+    parentIds: [],
+  },
+  {
+    id: 'cao-lizhong',
+    name: '曹立中',
+    generation: 2,
+    branch: '立中房',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '手绘图中位于曹建列下方的主节点。',
+    parentIds: ['cao-jianlie'],
+  },
+  ...[
+    ['cao-yushan', '曹裕善'],
+    ['cao-haoshan', '曹好善'],
+    ['cao-wangshan', '曹王善'],
+    ['cao-bingshan', '曹秉善'],
+  ].map(([id, name]) => ({
+    id,
+    name,
+    generation: 3,
+    branch: '立中房',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名和与曹立中的分支关系来自手绘世系图，字形及生平信息待家人核对。',
+    parentIds: ['cao-lizhong'],
+  })),
 ]
 
 export const sourceMaterials = [
-  { id: 'm1', title: '手写家谱总图', type: '原始照片', date: '2026-08-14', state: '待整理', icon: '▧' },
-  { id: 'm2', title: '家族口述记录 - 第一批', type: '访谈记录', date: '待上传', state: '空白', icon: '◌' },
-  { id: 'm3', title: '平度迁徙线索', type: '文字资料', date: '2026-08-12', state: '已归档', icon: '≋' },
+  { id: 'm1', title: '手绘曹氏世系图（原图）', type: '家族原始资料', date: '2026-08-14', state: '图像初录', icon: '▧', asset: '/materials/xiaoshikou-handwritten-tree.jpg' },
 ]

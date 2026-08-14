@@ -20,6 +20,17 @@ const PUBLIC_PEOPLE = [
   { id: 'cao-wanshan', name: '曹万善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
   { id: 'cao-rongshan', name: '曹荣善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
   { id: 'cao-lianshan', name: '曹连善', generation: 3, branch: '宝中房', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。', parentIds: ['cao-baozhong'] },
+  { id: 'cao-jiujiang', name: '曹九江', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-bingshan'] },
+  { id: 'cao-jiuxu', name: '曹九旭', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-bingshan'] },
+  { id: 'cao-jiuzhou', name: '曹九州', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-fushan'] },
+  { id: 'cao-jiushuai', name: '曹九帅', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-fushan'] },
+  { id: 'cao-jiuda', name: '曹九达', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-fushan'] },
+  { id: 'cao-jiuguo', name: '曹九国', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-wanshan'] },
+  { id: 'cao-jiuju', name: '曹九居', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-wanshan'] },
+  { id: 'cao-jiuceng', name: '曹九曾', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-rongshan'] },
+  { id: 'cao-jiuquan', name: '曹九全', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-rongshan'] },
+  { id: 'cao-jiuyou', name: '曹九有', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-lianshan'] },
+  { id: 'cao-jiuwu', name: '曹九梧', generation: 4, branch: '九字辈·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。', parentIds: ['cao-lianshan'] },
 ]
 
 exports.handler = function handler(event) {

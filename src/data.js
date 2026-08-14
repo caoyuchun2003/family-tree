@@ -105,6 +105,30 @@ export const initialPeople = [
     note: '姓名和与曹宝中的分支关系来自第二张放大图，字形待家人复核。',
     parentIds: ['cao-baozhong'],
   })),
+  ...[
+    ['cao-jiujiang', '曹九江', 'cao-bingshan'],
+    ['cao-jiuxu', '曹九旭', 'cao-bingshan'],
+    ['cao-jiuzhou', '曹九州', 'cao-fushan'],
+    ['cao-jiushuai', '曹九帅', 'cao-fushan'],
+    ['cao-jiuda', '曹九达', 'cao-fushan'],
+    ['cao-jiuguo', '曹九国', 'cao-wanshan'],
+    ['cao-jiuju', '曹九居', 'cao-wanshan'],
+    ['cao-jiuceng', '曹九曾', 'cao-rongshan'],
+    ['cao-jiuquan', '曹九全', 'cao-rongshan'],
+    ['cao-jiuyou', '曹九有', 'cao-lianshan'],
+    ['cao-jiuwu', '曹九梧', 'cao-lianshan'],
+  ].map(([id, name, parentId]) => ({
+    id,
+    name,
+    generation: 4,
+    branch: '九字辈·待核',
+    gender: '男',
+    years: '待考',
+    location: familyProfile.origin,
+    status: '待确认',
+    note: '姓名和父子连线来自第二、三张放大图，字形及归属房支待家人复核。',
+    parentIds: [parentId],
+  })),
 ]
 
 export const sourceMaterials = [

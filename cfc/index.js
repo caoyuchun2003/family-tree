@@ -6,7 +6,7 @@ const http = require('http')
 const https = require('https')
 
 // Public reads remain available even when the private server route is unreachable.
-// This mirrors the six real nodes currently transcribed from the Xiaoshikou image.
+// This mirrors the currently transcribed Xiaoshikou image records when the server API is unavailable.
 const PUBLIC_PEOPLE = [
   { id: 'cao-xiangzhong', name: '曹祥中', generation: 2, branch: '祥中房·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名来自第三张放大图，上游世系待家人复核。', parentIds: [] },
   { id: 'cao-qishan', name: '曹祺善', generation: 3, branch: '祥中房·待核', gender: '男', years: '待考', location: '山西省朔州市应县南河种镇小石口村', status: '待确认', note: '姓名及与曹祥中的连线来自第三张放大图，待家人复核。', parentIds: ['cao-xiangzhong'] },
@@ -56,8 +56,13 @@ exports.handler = function handler(event) {
   if (!isPublicRead && !isAuthenticated(event)) return Promise.resolve(response(401, JSON.stringify({ error: 'unauthorized' })))
 
   const base = (process.env.SERVER_API_BASE_URL || '').replace(/\/$/, '')
-  if (!base) return Promise.resolve(response(500, JSON.stringify({ error: 'SERVER_API_BASE_URL is not configured' })))
+  if (!base) return isPublicRead ? Promise.resolve(response(200, JSON.stringify(PUBLIC_PEOPLE))) : Promise.resolve(response(500, JSON.stringify({ error: 'SERVER_API_BASE_URL is not configured' })))
 
+  const upstream = proxyRequest(base, rawPath, method, event)
+  return isPublicRead ? upstream.then((result) => result.statusCode >= 200 && result.statusCode < 300 ? result : response(200, JSON.stringify(PUBLIC_PEOPLE))) : upstream
+}
+
+function proxyRequest(base, rawPath, method, event) {
   const target = new URL(`${base}${rawPath}`)
   const payload = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, 'base64') : Buffer.from(event.body)) : null
   const transport = target.protocol === 'https:' ? https : http
@@ -136,6 +141,6 @@ function corsHeaders(contentType) {
     'Content-Type': contentType || 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
   }
 }

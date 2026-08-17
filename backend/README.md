@@ -19,4 +19,4 @@ podman-compose up -d --build
 podman exec family-tree-api python -c 'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:18091/health").read())'
 ```
 
-目前 API 公开读取 `/people`，新增操作可以通过 `INTERNAL_API_KEY` 保护。正式接入百度云函数后，前端只连接云函数，云函数再带 `X-Internal-Key` 调用服务器 API。
+目前 API 公开读取 `/people`，新增、修改和审核操作可以通过 `INTERNAL_API_KEY` 保护。接口包括 `POST /people`、`PUT /people/{id}` 和 `POST /review`。正式接入百度云函数后，前端只连接云函数，云函数再带 `X-Internal-Key` 调用服务器 API。

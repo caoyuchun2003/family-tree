@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { clearSession, createPerson, getPeople, hasRemoteApi, hasSession, login } from './api'
+import { clearSession, createPerson, getPeople, hasRemoteApi, hasSession, login, reviewPerson, updatePerson } from './api'
 import { familyProfile, sourceMaterials } from './data'
 
 const navItems = [
@@ -28,8 +28,9 @@ function App() {
   const [active, setActive] = useState('overview')
   const [selectedId, setSelectedId] = useState('p4')
   const [query, setQuery] = useState('')
-  const [showModal, setShowModal] = useState(false)
+  const [editorPerson, setEditorPerson] = useState(undefined)
   const [authPrompt, setAuthPrompt] = useState('')
+  const [authTarget, setAuthTarget] = useState(null)
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(() => hasSession())
@@ -56,25 +57,30 @@ function App() {
   }, [toast])
 
   const selected = people.find((person) => person.id === selectedId) || people[0]
-  const pending = people.filter((person) => person.status === '待确认')
+  const pending = people.filter((person) => person.status !== '已确认')
   const filteredPeople = people.filter((person) => `${person.name}${person.branch}${person.location}`.includes(query.trim()))
 
-  function requestEditor(action) {
+  function requestEditor(action, target = null) {
     if (!authenticated) {
       setAuthPrompt(action)
+      setAuthTarget(target)
       return
     }
-    if (action === 'add') setShowModal(true)
-    else window.alert('编辑权限已验证；编辑表单将在下一步接入。')
+    if (action === 'add') setEditorPerson(null)
+    if (action === 'edit') setEditorPerson(target)
+    if (action === 'review') applyReview(target.id, target.decision)
   }
 
   async function handleEditorLogin(code) {
     await login(code)
     setAuthenticated(true)
     const action = authPrompt
+    const target = authTarget
     setAuthPrompt('')
-    if (action === 'add') setShowModal(true)
-    else setToast('编辑权限已验证')
+    setAuthTarget(null)
+    if (action === 'add') setEditorPerson(null)
+    if (action === 'edit') setEditorPerson(target)
+    if (action === 'review' && target) await applyReview(target.id, target.decision)
   }
 
   async function handleCreate(form) {
@@ -87,14 +93,14 @@ function App() {
       years: form.years || '信息待补充',
       location: form.location || '待补充',
       status: '待确认',
-      note: '由家族成员新增，等待管理员核实。',
-      parentIds: [],
+      note: form.note || '由家族成员新增，等待管理员核实。',
+      parentIds: form.parentId ? [form.parentId] : [],
     }
     try {
       const saved = await createPerson(person)
       setPeople((current) => [...current, saved])
       setSelectedId(saved.id)
-      setShowModal(false)
+      setEditorPerson(undefined)
       setToast('已添加成员，等待审核')
     } catch (error) {
       if (error.status === 401) {
@@ -106,6 +112,56 @@ function App() {
     }
   }
 
+  async function handleUpdate(form) {
+    const person = {
+      ...form.person,
+      name: form.name,
+      generation: Number(form.generation),
+      branch: form.branch || '待分支',
+      gender: form.gender,
+      years: form.years || '信息待补充',
+      location: form.location || '待补充',
+      status: '待确认',
+      note: form.note || '资料已更新，等待管理员核实。',
+      parentIds: form.parentId ? [form.parentId] : [],
+    }
+    try {
+      const saved = await updatePerson(person)
+      setPeople((current) => current.map((currentPerson) => currentPerson.id === saved.id ? saved : currentPerson))
+      setSelectedId(saved.id)
+      setEditorPerson(undefined)
+      setToast('成员资料已更新，等待审核')
+    } catch (error) {
+      if (error.status === 401) {
+        clearSession()
+        setAuthenticated(false)
+        setAuthPrompt('edit')
+        setAuthTarget(person)
+      }
+      setToast(error.message)
+    }
+  }
+
+  async function applyReview(id, decision) {
+    try {
+      const saved = await reviewPerson(id, decision)
+      setPeople((current) => current.map((person) => person.id === saved.id ? saved : person))
+      setToast(decision === 'confirm' ? '已确认归档' : '已退回补充资料')
+    } catch (error) {
+      if (error.status === 401) {
+        clearSession()
+        setAuthenticated(false)
+        setAuthPrompt('review')
+        setAuthTarget({ id, decision })
+      }
+      setToast(error.message)
+    }
+  }
+
+  function handleReview(id, decision) {
+    requestEditor('review', { id, decision })
+  }
+
   if (loading) return <div className="loading-screen"><div className="brand-mark">谱</div><p>正在打开家谱...</p></div>
 
   return (
@@ -114,7 +170,7 @@ function App() {
         <div className="brand"><div className="brand-mark">谱</div><div><strong>谱源</strong><span>家谱数字档案</span></div></div>
         <div className="family-switcher"><span className="eyebrow">当前家谱</span><strong>{familyProfile.title}</strong><button aria-label="切换家谱">⌄</button></div>
         <nav className="main-nav" aria-label="主要导航">
-          {navItems.map((item) => <button key={item.id} className={active === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setActive(item.id)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}
+          {navItems.map((item) => <button key={item.id} className={active === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setActive(item.id)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span>{(item.id === 'review' ? pending.length : item.badge) > 0 && <em>{item.id === 'review' ? pending.length : item.badge}</em>}</button>)}
         </nav>
         <div className="sidebar-bottom"><div className="sync-status"><span className="status-dot" />{hasRemoteApi() ? '已连接百度云接口' : '本地档案模式'}</div><button className="help-link">？ 使用说明</button><div className="user-chip"><div className="avatar">曹</div><div><strong>家谱管理员</strong><span>管理员权限</span></div><span className="more">•••</span></div></div>
       </aside>
@@ -122,14 +178,14 @@ function App() {
       <main className="main-content">
         <header className="topbar"><div className="breadcrumb"><span>我的家谱</span><b>/</b><strong>{navItems.find((item) => item.id === active)?.label}</strong></div><div className="top-actions"><label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、分支或地点" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="通知">♢<i /></button><button className="primary-button" onClick={() => requestEditor('add')}><span>＋</span> 添加成员</button></div></header>
 
-        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => requestEditor('add')} onEdit={() => requestEditor('edit')} treeZoom={treeZoom} onTreeZoomChange={setTreeZoom} treeFullscreen={treeFullscreen} onTreeFullscreenChange={setTreeFullscreen} />}
+        {active === 'overview' && <Overview people={people} selected={selected} pending={pending} onSelect={setSelectedId} onAdd={() => requestEditor('add')} onEdit={(person) => requestEditor('edit', person)} treeZoom={treeZoom} onTreeZoomChange={setTreeZoom} treeFullscreen={treeFullscreen} onTreeFullscreenChange={setTreeFullscreen} />}
         {active === 'members' && <Members people={filteredPeople} query={query} onSelect={(id) => { setSelectedId(id); setActive('overview') }} onAdd={() => requestEditor('add')} />}
         {active === 'materials' && <Materials />}
-        {active === 'review' && <Review pending={pending} onSelect={(id) => { setSelectedId(id); setActive('overview') }} />}
+        {active === 'review' && <Review pending={pending} onSelect={(id) => { setSelectedId(id); setActive('overview') }} onReview={handleReview} />}
       </main>
 
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
-      {showModal && <AddPersonModal onClose={() => setShowModal(false)} onSubmit={handleCreate} />}
+      {editorPerson !== undefined && <PersonModal person={editorPerson} people={people} onClose={() => setEditorPerson(undefined)} onSubmit={editorPerson ? handleUpdate : handleCreate} />}
       {authPrompt && <LoginScreen onClose={() => setAuthPrompt('')} onLogin={handleEditorLogin} />}
     </div>
   )
@@ -170,13 +226,14 @@ function Tree({ people, selectedId, onSelect, zoom }) {
     if (!parent || !child) return null
     return <line key={`${parentId}-${person.id}`} x1={`${parent[0] + 14}%`} y1={`${parent[1] + 3}%`} x2={`${child[0]}%`} y2={`${child[1] + 3}%`} />
   }).filter(Boolean))
-  return <div className="tree-viewport"><div className="tree-stage-frame" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}><div className="tree-canvas" style={{ width: `${stageWidth}px`, height: `${stageHeight}px`, transform: `scale(${zoom})` }}><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels">{generations.map((generation, index) => <span key={generation} style={{ left: `${6 + (index * 80) / Math.max(generations.length - 1, 1)}%` }}>第{generation}世</span>)}</div>{visible.map((person) => { const [left, top] = positions[person.id]; return <button key={person.id} className={`person-node ${person.status === '待确认' ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{person.status === '待确认' && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：已录入世代；待考信息以橙点标记</div></div></div></div>
+  return <div className="tree-viewport"><div className="tree-stage-frame" style={{ width: `${stageWidth * zoom}px`, height: `${stageHeight * zoom}px` }}><div className="tree-canvas" style={{ width: `${stageWidth}px`, height: `${stageHeight}px`, transform: `scale(${zoom})` }}><svg className="tree-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{lines}</svg><div className="generation-labels">{generations.map((generation, index) => <span key={generation} style={{ left: `${6 + (index * 80) / Math.max(generations.length - 1, 1)}%` }}>第{generation}世</span>)}</div>{visible.map((person) => { const [left, top] = positions[person.id]; const pending = person.status !== '已确认'; return <button key={person.id} className={`person-node ${pending ? 'is-pending' : ''} ${person.id === selectedId ? 'is-selected' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(person.id)}><span className="node-avatar">{person.name.slice(0, 1)}</span><span className="node-copy"><strong>{person.name}</strong><small>{person.branch} · {person.generation}世</small></span>{pending && <i className="pending-dot" />}</button> })}<div className="tree-scale">可视范围：已录入世代；待考信息以橙点标记</div></div></div></div>
 }
 
 function PersonPanel({ person, people, onEdit }) {
   if (!person) return <aside className="panel person-panel empty-panel">选择一个成员查看资料</aside>
   const children = people.filter((candidate) => candidate.parentIds?.includes(person.id))
-  return <aside className="panel person-panel"><div className="person-cover"><div className="cover-pattern" /><button className="close-detail" aria-label="关闭">×</button><div className="large-avatar">{person.name.slice(0, 1)}</div></div><div className="person-info"><div className="detail-heading"><div><span className="eyebrow">第 {person.generation} 世 · {person.branch}</span><h2>{person.name}</h2></div><button className="edit-button" onClick={onEdit}>编辑</button></div><span className={person.status === '待确认' ? 'status-pill pending-pill' : 'status-pill'}>{person.status === '待确认' ? '◷ 待家人确认' : '✓ 信息已确认'}</span><div className="detail-meta"><Meta label="生卒" value={person.years} /><Meta label="籍贯 / 居住地" value={person.location} /></div><div className="detail-section"><span className="eyebrow">人物简介</span><p>{person.note}</p></div><div className="detail-section"><div className="section-title"><span className="eyebrow">直系后代</span><span>{children.length} 人</span></div>{children.length ? <div className="children-list">{children.map((child) => <button key={child.id}><span className="mini-avatar">{child.name.slice(0, 1)}</span><span><strong>{child.name}</strong><small>第 {child.generation} 世 · {child.branch}</small></span><b>›</b></button>)}</div> : <p className="muted">暂无已录入的后代信息</p>}</div><button className="full-profile">查看完整人物档案 <span>→</span></button></div></aside>
+  const statusText = person.status === '已确认' ? '✓ 信息已确认' : person.status === '已退回' ? '↺ 已退回待补充' : '◷ 待家人确认'
+  return <aside className="panel person-panel"><div className="person-cover"><div className="cover-pattern" /><button className="close-detail" aria-label="关闭">×</button><div className="large-avatar">{person.name.slice(0, 1)}</div></div><div className="person-info"><div className="detail-heading"><div><span className="eyebrow">第 {person.generation} 世 · {person.branch}</span><h2>{person.name}</h2></div><button className="edit-button" onClick={() => onEdit(person)}>编辑</button></div><span className={person.status === '已确认' ? 'status-pill' : 'status-pill pending-pill'}>{statusText}</span><div className="detail-meta"><Meta label="生卒" value={person.years} /><Meta label="籍贯 / 居住地" value={person.location} /></div><div className="detail-section"><span className="eyebrow">人物简介</span><p>{person.note}</p></div><div className="detail-section"><div className="section-title"><span className="eyebrow">直系后代</span><span>{children.length} 人</span></div>{children.length ? <div className="children-list">{children.map((child) => <button key={child.id}><span className="mini-avatar">{child.name.slice(0, 1)}</span><span><strong>{child.name}</strong><small>第 {child.generation} 世 · {child.branch}</small></span><b>›</b></button>)}</div> : <p className="muted">暂无已录入的后代信息</p>}</div><button className="full-profile">查看完整人物档案 <span>→</span></button></div></aside>
 }
 
 function Meta({ label, value }) { return <div><span>{label}</span><strong>{value}</strong></div> }
@@ -184,21 +241,32 @@ function Activity({ icon, color, title, detail, time }) { return <div className=
 function Stat({ label, value, suffix, trend, icon, tone }) { return <div className="stat-card"><div className={`stat-icon ${tone}`}>{icon}</div><div className="stat-text"><span>{label}</span><strong>{value}<small>{suffix}</small></strong><p>{trend}</p></div><span className="stat-arrow">↗</span></div> }
 
 function Members({ people, query, onSelect, onAdd }) {
-  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">成员管理</span><h1>家族成员</h1><p>{query ? `正在筛选“${query}”` : '维护家谱中的每一位成员与关系。'}</p></div><button className="primary-button" onClick={onAdd}>＋ 添加成员</button></section><div className="panel table-panel"><div className="table-toolbar"><strong>全部成员 <small>{people.length}</small></strong><span>按世代排序　⌄</span></div><div className="member-table"><div className="table-row table-head"><span>成员</span><span>世代 / 分支</span><span>生卒</span><span>地点</span><span>状态</span><span /></div>{people.map((person) => <button className="table-row" key={person.id} onClick={() => onSelect(person.id)}><span className="table-person"><span className="mini-avatar">{person.name.slice(0, 1)}</span><strong>{person.name}</strong></span><span>第 {person.generation} 世 · {person.branch}</span><span>{person.years}</span><span>{person.location}</span><span><i className={person.status === '待确认' ? 'table-status pending' : 'table-status'}>{person.status}</i></span><span>›</span></button>)}</div></div></div>
+  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">成员管理</span><h1>家族成员</h1><p>{query ? `正在筛选“${query}”` : '维护家谱中的每一位成员与关系。'}</p></div><button className="primary-button" onClick={onAdd}>＋ 添加成员</button></section><div className="panel table-panel"><div className="table-toolbar"><strong>全部成员 <small>{people.length}</small></strong><span>按世代排序　⌄</span></div><div className="member-table"><div className="table-row table-head"><span>成员</span><span>世代 / 分支</span><span>生卒</span><span>地点</span><span>状态</span><span /></div>{people.map((person) => <button className="table-row" key={person.id} onClick={() => onSelect(person.id)}><span className="table-person"><span className="mini-avatar">{person.name.slice(0, 1)}</span><strong>{person.name}</strong></span><span>第 {person.generation} 世 · {person.branch}</span><span>{person.years}</span><span>{person.location}</span><span><i className={person.status === '已确认' ? 'table-status' : 'table-status pending'}>{person.status}</i></span><span>›</span></button>)}</div></div></div>
 }
 
 function Materials() {
   return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">资料库</span><h1>家族资料</h1><p>围绕 {familyProfile.origin} 建立可追溯的真实档案。</p></div><button className="primary-button" onClick={() => window.alert('请准备好原始资料后上传：家谱、墓碑、户口簿或口述记录')}>⇧ 上传资料</button></section><div className="material-grid">{sourceMaterials.map((material) => <div className="panel material-card" key={material.id}>{material.asset ? <img className="material-thumb" src={material.asset} alt="手绘曹氏世系图缩略图" /> : <div className="material-icon">{material.icon}</div>}<div><span className="material-type">{material.type}</span><h3>{material.title}</h3><p>{material.date}</p></div><span className={`material-state ${material.state === '已归档' ? 'done' : ''}`}>{material.state}</span><button>···</button></div>)}</div><div className="panel empty-material"><div>▧</div><h2>先收集一手资料</h2><p>上传家谱原件、碑刻照片、老户口簿或家人口述，逐条核实后再扩展世系。</p><button className="secondary-button">选择文件</button></div></div>
 }
 
-function Review({ pending, onSelect }) {
-  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">审核中心</span><h1>待确认信息</h1><p>这些内容需要家人一起核对，确认后才会成为正式档案。</p></div><span className="review-count">{pending.length} 条待处理</span></section><div className="review-list">{pending.map((person) => <button className="panel review-card" key={person.id} onClick={() => onSelect(person.id)}><span className="large-avatar small">{person.name.slice(0, 1)}</span><div><span className="eyebrow">第 {person.generation} 世 · {person.branch}</span><h3>{person.name}</h3><p>{person.note}</p></div><span className="review-action">去核对 →</span></button>)}{!pending.length && <div className="panel empty-material"><div>✓</div><h2>全部确认完成</h2><p>目前没有待家人核对的信息。</p></div>}</div></div>
+function Review({ pending, onSelect, onReview }) {
+  return <div className="page-wrap simple-page"><section className="page-heading"><div><span className="eyebrow">审核中心</span><h1>待确认信息</h1><p>这些内容需要家人一起核对，确认后才会成为正式档案。</p></div><span className="review-count">{pending.length} 条待处理</span></section><div className="review-list">{pending.map((person) => <div className="panel review-card" key={person.id}><button className="review-main" onClick={() => onSelect(person.id)}><span className="large-avatar small">{person.name.slice(0, 1)}</span><span><span className="eyebrow">第 {person.generation} 世 · {person.branch}</span><strong>{person.name}</strong><p>{person.note}</p><small className="review-status">当前状态：{person.status}</small></span><span className="review-action">去核对 →</span></button><div className="review-actions"><button className="secondary-button" onClick={() => onReview(person.id, 'reject')}>退回补充</button><button className="primary-button" onClick={() => onReview(person.id, 'confirm')}>确认归档</button></div></div>)}{!pending.length && <div className="panel empty-material"><div>✓</div><h2>全部确认完成</h2><p>目前没有待家人核对的信息。</p></div>}</div></div>
 }
 
-function AddPersonModal({ onClose, onSubmit }) {
-  const [form, setForm] = useState({ name: '', generation: 5, branch: '本房', gender: '男', years: '', location: '' })
+function PersonModal({ person, people, onClose, onSubmit }) {
+  const [form, setForm] = useState({
+    name: person?.name || '',
+    generation: person?.generation || 5,
+    branch: person?.branch || '本房',
+    gender: person?.gender || '男',
+    years: person?.years === '待考' ? '' : (person?.years || ''),
+    location: person?.location === familyProfile.origin ? '' : (person?.location || ''),
+    note: person?.note || '',
+    parentId: person?.parentIds?.[0] || '',
+    person,
+  })
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
-  return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={(event) => { event.preventDefault(); if (form.name.trim()) onSubmit(form) }} onMouseDown={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">新增档案</span><h2>添加家族成员</h2></div><button type="button" onClick={onClose}>×</button></div><label>姓名<input autoFocus required value={form.name} onChange={update('name')} placeholder="请输入姓名" /></label><div className="form-row"><label>世代<input type="number" min="1" max="20" value={form.generation} onChange={update('generation')} /></label><label>性别<select value={form.gender} onChange={update('gender')}><option>男</option><option>女</option></select></label></div><div className="form-row"><label>分支<input value={form.branch} onChange={update('branch')} /></label><label>地点<input value={form.location} onChange={update('location')} placeholder="待补充" /></label></div><label>生卒信息<input value={form.years} onChange={update('years')} placeholder="例如：1950 — 现在" /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>取消</button><button className="primary-button" type="submit">保存成员</button></div></form></div>
+  const parentOptions = people.filter((candidate) => candidate.id !== person?.id && candidate.generation < Number(form.generation)).sort((a, b) => a.generation - b.generation || a.name.localeCompare(b.name))
+  return <div className="modal-backdrop" onMouseDown={onClose}><form className="modal" onSubmit={(event) => { event.preventDefault(); if (form.name.trim()) onSubmit(form) }} onMouseDown={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">{person ? '编辑档案' : '新增档案'}</span><h2>{person ? `编辑 ${person.name}` : '添加家族成员'}</h2></div><button type="button" onClick={onClose}>×</button></div><label>姓名<input autoFocus required value={form.name} onChange={update('name')} placeholder="请输入姓名" /></label><div className="form-row"><label>世代<input type="number" min="0" max="20" value={form.generation} onChange={update('generation')} /></label><label>性别<select value={form.gender} onChange={update('gender')}><option>男</option><option>女</option></select></label></div><div className="form-row"><label>分支<input value={form.branch} onChange={update('branch')} /></label><label>地点<input value={form.location} onChange={update('location')} placeholder="待补充" /></label></div><label>上一级成员<select value={form.parentId} onChange={update('parentId')}><option value="">暂不指定</option>{parentOptions.map((candidate) => <option key={candidate.id} value={candidate.id}>第 {candidate.generation} 世 · {candidate.name} · {candidate.branch}</option>)}</select></label><label>生卒信息<input value={form.years} onChange={update('years')} placeholder="例如：1950 — 现在" /></label><label>人物简介<textarea value={form.note} onChange={update('note')} placeholder="记录资料来源或待核实内容" rows="3" /></label><div className="modal-hint">保存后会进入审核中心，确认前不会标记为正式档案。</div><div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>取消</button><button className="primary-button" type="submit">{person ? '保存并重新审核' : '保存成员'}</button></div></form></div>
 }
 
 export default App

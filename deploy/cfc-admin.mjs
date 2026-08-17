@@ -134,11 +134,17 @@ async function createTrigger(functionBrn) {
   const query = `FunctionBrn=${encode(functionBrn)}`
   const relations = (await request('GET', '/v1/relation', query)).Relation || []
   const existing = relations.find((relation) => relation.Data?.ResourcePath === '/api/{proxy+}')
-  if (existing) return existing
+  if (existing && String(triggerData(existing).Method || '').split(',').includes('PUT')) return existing
+  if (existing) {
+    const source = existing.Source || 'cfc-http-trigger/v1/CFCAPI'
+    const relationId = existing.RelationId || triggerData(existing).Brn
+    const deleteQuery = `Target=${encode(functionBrn)}&Source=${encode(source)}&RelationId=${encode(relationId)}`
+    await request('DELETE', '/v1/relation', deleteQuery)
+  }
   return request('POST', '/v1/relation', '', JSON.stringify({
     Target: functionBrn,
     Source: 'cfc-http-trigger/v1/CFCAPI',
-    Data: { AuthType: 'anonymous', Method: 'GET,POST,OPTIONS', ResourcePath: '/api/{proxy+}' },
+    Data: { AuthType: 'anonymous', Method: 'GET,POST,PUT,OPTIONS', ResourcePath: '/api/{proxy+}' },
   }))
 }
 

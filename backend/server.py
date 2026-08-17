@@ -85,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", os.environ.get("CORS_ORIGIN", "*"))
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Internal-Key")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
         self.end_headers()
         self.wfile.write(body)
 
@@ -112,6 +112,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/")
+        if path == "/review":
+            if not self._authorized():
+                self._send({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+                return
+            try:
+                payload = self._read_json()
+                person_id = str(payload.get("id", ""))
+                decision = payload.get("decision")
+                if not person_id or decision not in {"confirm", "reject"}:
+                    raise ValueError("invalid_review")
+                with connect_db() as connection:
+                    row = connection.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
+                    if row is None:
+                        self._send({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+                        return
+                    status = "已确认" if decision == "confirm" else "已退回"
+                    connection.execute("UPDATE people SET status = ? WHERE id = ?", (status, person_id))
+                    connection.commit()
+                    updated = connection.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
+                self._send(row_to_person(updated))
+            except (ValueError, json.JSONDecodeError) as error:
+                self._send({"error": str(error) or "invalid_request"}, HTTPStatus.BAD_REQUEST)
+            return
         if path != "/people":
             self._send({"error": "not_found"}, HTTPStatus.NOT_FOUND)
             return
@@ -119,19 +142,61 @@ class Handler(BaseHTTPRequestHandler):
             self._send({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
             return
         try:
-            size = int(self.headers.get("Content-Length", "0"))
-            if size > 256_000:
-                raise ValueError("payload_too_large")
-            person = json.loads(self.rfile.read(size))
-            required = ["id", "name", "generation", "branch", "gender", "years", "location", "status", "note"]
-            if any(not person.get(key) for key in required):
-                raise ValueError("missing_field")
+            person = self._read_json()
+            self._validate_person(person)
             with connect_db() as connection:
                 connection.execute("INSERT INTO people (id,name,generation,branch,gender,years,location,status,note,parent_ids) VALUES (?,?,?,?,?,?,?,?,?,?)", (person["id"], person["name"], int(person["generation"]), person["branch"], person["gender"], person["years"], person["location"], person["status"], person["note"], json.dumps(person.get("parentIds", []), ensure_ascii=False)))
                 connection.commit()
             self._send(person, HTTPStatus.CREATED)
         except (ValueError, json.JSONDecodeError, sqlite3.IntegrityError) as error:
             self._send({"error": str(error) or "invalid_request"}, HTTPStatus.BAD_REQUEST)
+
+    def do_PUT(self):
+        path = urlparse(self.path).path.rstrip("/")
+        prefix = "/people/"
+        if not path.startswith(prefix) or not path[len(prefix):]:
+            self._send({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+            return
+        if not self._authorized():
+            self._send({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+            return
+        person_id = path[len(prefix):]
+        try:
+            person = self._read_json()
+            person["id"] = person_id
+            self._validate_person(person, allow_status=False)
+            with connect_db() as connection:
+                if connection.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone() is None:
+                    self._send({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+                    return
+                connection.execute("""UPDATE people SET name=?, generation=?, branch=?, gender=?, years=?, location=?, status=?, note=?, parent_ids=? WHERE id=?""", (person["name"], int(person["generation"]), person["branch"], person["gender"], person["years"], person["location"], "待确认", person["note"], json.dumps(person.get("parentIds", []), ensure_ascii=False), person_id))
+                connection.commit()
+                updated = connection.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
+            self._send(row_to_person(updated))
+        except (ValueError, json.JSONDecodeError, sqlite3.IntegrityError) as error:
+            self._send({"error": str(error) or "invalid_request"}, HTTPStatus.BAD_REQUEST)
+
+    def _read_json(self):
+        size = int(self.headers.get("Content-Length", "0"))
+        if size > 256_000:
+            raise ValueError("payload_too_large")
+        payload = json.loads(self.rfile.read(size))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_object")
+        return payload
+
+    @staticmethod
+    def _validate_person(person, allow_status=True):
+        required = ["id", "name", "generation", "branch", "gender", "years", "location", "note"]
+        if allow_status:
+            required.append("status")
+        if any(not person.get(key) and person.get(key) != 0 for key in required):
+            raise ValueError("missing_field")
+        if int(person["generation"]) < 0:
+            raise ValueError("invalid_generation")
+        parent_ids = person.get("parentIds", [])
+        if not isinstance(parent_ids, list) or person["id"] in parent_ids:
+            raise ValueError("invalid_parent_ids")
 
 
 if __name__ == "__main__":

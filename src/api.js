@@ -49,6 +49,45 @@ export async function createPerson(person) {
   return response.json()
 }
 
+export async function updatePerson(person) {
+  if (!API_BASE_URL) {
+    const people = localPeople().map((current) => current.id === person.id ? person : current)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(people))
+    return person
+  }
+  const response = await fetch(`${API_BASE_URL}/people/${encodeURIComponent(person.id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(person),
+  })
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? '登录已过期，请重新输入口令' : '成员更新失败')
+    error.status = response.status
+    throw error
+  }
+  return response.json()
+}
+
+export async function reviewPerson(id, decision) {
+  if (!API_BASE_URL) {
+    const status = decision === 'confirm' ? '已确认' : '已退回'
+    const people = localPeople().map((person) => person.id === id ? { ...person, status } : person)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(people))
+    return people.find((person) => person.id === id)
+  }
+  const response = await fetch(`${API_BASE_URL}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ id, decision }),
+  })
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? '登录已过期，请重新输入口令' : '审核操作失败')
+    error.status = response.status
+    throw error
+  }
+  return response.json()
+}
+
 export function hasRemoteApi() {
   return Boolean(API_BASE_URL)
 }
